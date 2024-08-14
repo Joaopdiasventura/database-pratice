@@ -1,4 +1,4 @@
-import { prisma } from "../service/prisma.service.js";
+import { prisma } from "../services/prisma.service.js";
 
 class UserService {
     async create(data) {

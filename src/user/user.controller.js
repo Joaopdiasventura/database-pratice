@@ -3,45 +3,47 @@ import { hash, compare } from "bcrypt";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = "pudim";
+const SALT_ROUNDS = 10;
 
 export class UserController {
     async create(req, res) {
         const { body } = req;
-        const existUser = await userService.findByEmail(body.email);
-        if (existUser) {
-            return res.status(400).send({ message: "Esse email já está cadastrado" });
+
+        try {
+            const existUser = await userService.findByEmail(body.email);
+            if (existUser) {
+                return res.status(400).send({ message: "Esse email já está cadastrado" });
+            }
+
+            body.password = await this.hashPassword(body.password);
+
+            const user = await userService.create(body);
+
+            return res.status(200).send({ token: this.createToken(user) });
+        } catch (error) {
+            console.error("Erro ao criar usuário:", error);
+            return res.status(500).send({ message: "Erro ao criar usuário" });
         }
-
-        console.log("antes", body.password);
-        body.password = await hash(body.password, 10);
-        console.log("depois", body.password);
-
-        const user = await userService.create(body);
-
-        const token = jwt.sign({ email: user.email }, JWT_SECRET, { expiresIn: '1h' });
-
-        return res.status(201).send({ token });
     }
 
     async login(req, res) {
         const { body } = req;
-        const user = await userService.findByEmail(body.email);
-        if (!user) {
-            return res.status(404).send({ message: "Esse email não está cadastrado" });
+
+        try {
+            const user = await userService.findByEmail(body.email);
+            if (!user) {
+                return res.status(404).send({ message: "Esse email não está cadastrado" });
+            }
+
+            if (!await this.comparePassword(body.password, user.password)) {
+                return res.status(401).send({ message: "Senha incorreta" });
+            }
+
+            return res.status(200).send({ token: this.createToken(user.email) });
+        } catch (error) {
+            console.error("Erro ao fazer login:", error);
+            return res.status(500).send({ message: "Erro ao fazer login" });
         }
-
-        console.log('Senha fornecida:', body.password);
-        console.log('Senha hashada armazenada:', user.password);
-
-        console.log(await compare(body.password, user.password));
-
-        if (!(await compare(body.password, user.password))) {
-            return res.status(401).send({ message: "Senha incorreta" });
-        }
-
-        const token = jwt.sign({ email: user.email }, JWT_SECRET, { expiresIn: '1h' });
-
-        return res.status(200).send({ token });
     }
 
     async decode(req, res) {
@@ -49,15 +51,28 @@ export class UserController {
 
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
-
-            const user = await userService.findByEmail(decoded.email);
+            
+            const user = await userService.findByEmail(decoded);
             if (!user) {
-                return res.status(404).send({ message: "Esse email não está cadastrado" });
+                return res.status(400).send({ message: "Token inválido" });
             }
 
             return res.status(200).send(user);
         } catch (error) {
+            console.error("Erro ao decodificar token:", error);
             return res.status(400).send({ message: "Token inválido" });
         }
+    }
+
+    createToken(email) {
+        return jwt.sign(email, JWT_SECRET)
+    }
+
+    async hashPassword(password) {
+        return await hash(password, SALT_ROUNDS);
+    }
+
+    async comparePassword(password, password_) {
+        return await compare(password, password_);
     }
 }
