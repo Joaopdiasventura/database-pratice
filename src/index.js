@@ -1,12 +1,15 @@
-import express from "express";
-import { UserRoutes } from "./user/user.route.js"
+import { config } from "dotenv";
+config();
 
-const app = express()
+import express from "express";
+import { UserRoutes } from "./user/user.route.js";
+
+const app = express();
 
 app.use(express.json());
 
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/user", UserRoutes)
+app.use("/user", UserRoutes);
 
-app.listen(3000, () => console.log("Servidor rodando"))
+app.listen(3000, () => console.log("Servidor rodando"));
